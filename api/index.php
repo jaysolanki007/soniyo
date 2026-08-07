@@ -10,6 +10,17 @@ putenv("APP_STORAGE=$storagePath");
 $_ENV['APP_STORAGE'] = $storagePath;
 $_SERVER['APP_STORAGE'] = $storagePath;
 
+// Redirect Laravel bootstrap cache files to writable /tmp
+putenv("APP_SERVICES_CACHE=$storagePath/bootstrap-services.php");
+putenv("APP_PACKAGES_CACHE=$storagePath/bootstrap-packages.php");
+putenv("APP_CONFIG_CACHE=$storagePath/bootstrap-config.php");
+putenv("APP_ROUTES_CACHE=$storagePath/bootstrap-routes.php");
+putenv("APP_EVENTS_CACHE=$storagePath/bootstrap-events.php");
+putenv("VIEW_COMPILED_PATH=$storagePath/framework/views");
+
+$_ENV['VIEW_COMPILED_PATH'] = "$storagePath/framework/views";
+$_SERVER['VIEW_COMPILED_PATH'] = "$storagePath/framework/views";
+
 $storageFolders = [
     "$storagePath/app/public",
     "$storagePath/framework/cache/data",

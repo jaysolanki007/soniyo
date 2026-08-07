@@ -6,13 +6,19 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
 // Set Vercel writable storage path BEFORE Application is configured
-if (isset($_ENV['VERCEL']) || getenv('VERCEL')) {
-    putenv('APP_STORAGE=/tmp/storage');
-    $_ENV['APP_STORAGE'] = '/tmp/storage';
-    $_SERVER['APP_STORAGE'] = '/tmp/storage';
-
-
+if (isset($_ENV['VERCEL']) || getenv('VERCEL') || file_exists('/var/task')) {
     $storagePath = '/tmp/storage';
+    putenv("APP_STORAGE=$storagePath");
+    $_ENV['APP_STORAGE'] = $storagePath;
+    $_SERVER['APP_STORAGE'] = $storagePath;
+
+    putenv("APP_SERVICES_CACHE=$storagePath/bootstrap-services.php");
+    putenv("APP_PACKAGES_CACHE=$storagePath/bootstrap-packages.php");
+    putenv("APP_CONFIG_CACHE=$storagePath/bootstrap-config.php");
+    putenv("APP_ROUTES_CACHE=$storagePath/bootstrap-routes.php");
+    putenv("APP_EVENTS_CACHE=$storagePath/bootstrap-events.php");
+    putenv("VIEW_COMPILED_PATH=$storagePath/framework/views");
+
     $storageFolders = [
         "$storagePath/app/public",
         "$storagePath/framework/cache/data",
@@ -45,5 +51,3 @@ return Application::configure(basePath: dirname(__DIR__))
             fn (Request $request) => $request->is('api/*'),
         );
     })->create();
-
-
