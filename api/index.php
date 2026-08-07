@@ -5,6 +5,11 @@ putenv("VERCEL=1");
 $_ENV['VERCEL'] = '1';
 $_SERVER['VERCEL'] = '1';
 
+// Force HTTPS protocol for Vercel proxy headers
+putenv("HTTPS=on");
+$_ENV['HTTPS'] = 'on';
+$_SERVER['HTTPS'] = 'on';
+
 $storagePath = '/tmp/storage';
 putenv("APP_STORAGE=$storagePath");
 $_ENV['APP_STORAGE'] = $storagePath;
@@ -48,16 +53,33 @@ putenv("LOG_CHANNEL=stderr");
 $_ENV['LOG_CHANNEL'] = 'stderr';
 $_SERVER['LOG_CHANNEL'] = 'stderr';
 
-// If DB_HOST is localhost/127.0.0.1 or not configured, fallback session and cache to prevent 500 DB connection error
+// If DB_HOST is localhost/127.0.0.1 or not configured, copy bundled SQLite database to /tmp for Vercel
 $dbHost = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? '');
 if (empty($dbHost) || $dbHost === '127.0.0.1' || $dbHost === 'localhost') {
-    putenv("SESSION_DRIVER=cookie");
-    $_ENV['SESSION_DRIVER'] = 'cookie';
-    $_SERVER['SESSION_DRIVER'] = 'cookie';
+    $tmpSqlite = '/tmp/database.sqlite';
+    $sourceSqlite = __DIR__ . '/../database/database.sqlite';
 
-    putenv("CACHE_STORE=array");
-    $_ENV['CACHE_STORE'] = 'array';
-    $_SERVER['CACHE_STORE'] = 'array';
+    if (!file_exists($tmpSqlite) && file_exists($sourceSqlite)) {
+        @copy($sourceSqlite, $tmpSqlite);
+    } elseif (!file_exists($tmpSqlite)) {
+        @touch($tmpSqlite);
+    }
+
+    putenv("DB_CONNECTION=sqlite");
+    $_ENV['DB_CONNECTION'] = 'sqlite';
+    $_SERVER['DB_CONNECTION'] = 'sqlite';
+
+    putenv("DB_DATABASE=$tmpSqlite");
+    $_ENV['DB_DATABASE'] = $tmpSqlite;
+    $_SERVER['DB_DATABASE'] = $tmpSqlite;
+
+    putenv("SESSION_DRIVER=database");
+    $_ENV['SESSION_DRIVER'] = 'database';
+    $_SERVER['SESSION_DRIVER'] = 'database';
+
+    putenv("CACHE_STORE=database");
+    $_ENV['CACHE_STORE'] = 'database';
+    $_SERVER['CACHE_STORE'] = 'database';
 }
 
 // Forward request to Laravel's public/index.php
