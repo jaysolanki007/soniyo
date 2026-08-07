@@ -66,6 +66,10 @@ if (!empty($dbHost) && $dbHost !== '127.0.0.1' && $dbHost !== 'localhost') {
             $kernel->call('migrate', ['--force' => true]);
             $kernel->call('db:seed', ['--force' => true]);
             @touch($migratedFlag);
+
+            // Handle the request directly using the booted $app
+            $app->handleRequest(\Illuminate\Http\Request::capture());
+            exit;
         } catch (\Throwable $e) {
             error_log('Aiven Auto-Migration Notice: ' . $e->getMessage());
         }
