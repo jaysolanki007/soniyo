@@ -11,8 +11,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        if (isset($_ENV['VERCEL']) || getenv('VERCEL')) {
+            $this->app->useStoragePath('/tmp/storage');
+            config(['view.compiled' => '/tmp/storage/framework/views']);
+        }
     }
+
 
     /**
      * Bootstrap any application services.

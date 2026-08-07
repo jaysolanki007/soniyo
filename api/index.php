@@ -1,7 +1,15 @@
 <?php
 
-// Prepare writable storage directory in Vercel serverless environment
+// Set Vercel environment flag and writable storage path BEFORE booting Laravel
+putenv("VERCEL=1");
+$_ENV['VERCEL'] = '1';
+$_SERVER['VERCEL'] = '1';
+
 $storagePath = '/tmp/storage';
+putenv("APP_STORAGE=$storagePath");
+$_ENV['APP_STORAGE'] = $storagePath;
+$_SERVER['APP_STORAGE'] = $storagePath;
+
 $storageFolders = [
     "$storagePath/app/public",
     "$storagePath/framework/cache/data",
