@@ -53,9 +53,12 @@ putenv("LOG_CHANNEL=stderr");
 $_ENV['LOG_CHANNEL'] = 'stderr';
 $_SERVER['LOG_CHANNEL'] = 'stderr';
 
-// If DB_HOST is localhost/127.0.0.1 or not configured, copy bundled SQLite database to /tmp for Vercel
+// Check if a remote database (e.g. Aiven) is configured via Vercel Environment Variables
 $dbHost = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? '');
-if (empty($dbHost) || $dbHost === '127.0.0.1' || $dbHost === 'localhost') {
+if (!empty($dbHost) && $dbHost !== '127.0.0.1' && $dbHost !== 'localhost') {
+    // Remote database provided (Aiven PostgreSQL/MySQL)
+} else {
+    // Fallback to bundled SQLite database in /tmp
     $tmpSqlite = '/tmp/database.sqlite';
     $sourceSqlite = __DIR__ . '/../database/database.sqlite';
 
