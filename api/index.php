@@ -59,7 +59,7 @@ if (empty($dbHost) || $dbHost === '127.0.0.1' || $dbHost === 'localhost') {
     $tmpSqlite = '/tmp/database.sqlite';
     $sourceSqlite = __DIR__ . '/../database/database.sqlite';
 
-    if (!file_exists($tmpSqlite) && file_exists($sourceSqlite)) {
+    if (file_exists($sourceSqlite)) {
         @copy($sourceSqlite, $tmpSqlite);
     } elseif (!file_exists($tmpSqlite)) {
         @touch($tmpSqlite);
