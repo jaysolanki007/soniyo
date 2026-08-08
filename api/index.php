@@ -53,6 +53,13 @@ putenv("LOG_CHANNEL=stderr");
 $_ENV['LOG_CHANNEL'] = 'stderr';
 $_SERVER['LOG_CHANNEL'] = 'stderr';
 
+// Cookie sessions avoid a DB round trip on every request (unless overridden in Vercel env)
+if (empty(getenv('SESSION_DRIVER')) && empty($_ENV['SESSION_DRIVER'])) {
+    putenv("SESSION_DRIVER=cookie");
+    $_ENV['SESSION_DRIVER'] = 'cookie';
+    $_SERVER['SESSION_DRIVER'] = 'cookie';
+}
+
 // Detect Vercel Marketplace Database (Neon / Supabase / Postgres) or DB_HOST
 $postgresUrl = getenv('POSTGRES_URL') ?: (getenv('DATABASE_URL') ?: ($_ENV['POSTGRES_URL'] ?? ($_ENV['DATABASE_URL'] ?? '')));
 $dbHost = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? '');
@@ -97,22 +104,48 @@ if (!empty($postgresUrl)) {
 }
 
 if (!empty($dbHost) && $dbHost !== '127.0.0.1' && $dbHost !== 'localhost') {
-    // Automatically run migrations & seeders on the remote Vercel/Neon database if not yet run
+    // Run migrations & seeders only if the remote database has never been migrated.
+    // The /tmp flag is just a per-instance memo; the real check is against the DB
+    // itself, so new serverless instances DON'T re-run migrate/seed on cold start.
     $migratedFlag = '/tmp/vercel_db_migrated';
     if (!file_exists($migratedFlag)) {
+        $needsMigration = false;
         try {
-            require_once __DIR__ . '/../vendor/autoload.php';
-            $app = require __DIR__ . '/../bootstrap/app.php';
-            $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
-            $kernel->call('migrate', ['--force' => true]);
-            $kernel->call('db:seed', ['--force' => true]);
-            @touch($migratedFlag);
-
-            // Handle request directly
-            $app->handleRequest(\Illuminate\Http\Request::capture());
-            exit;
+            $dsn = sprintf(
+                'pgsql:host=%s;port=%s;dbname=%s;sslmode=require',
+                getenv('DB_HOST'),
+                getenv('DB_PORT') ?: '5432',
+                getenv('DB_DATABASE')
+            );
+            $pdo = new \PDO($dsn, getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_TIMEOUT => 5,
+            ]);
+            $stmt = $pdo->query("SELECT COUNT(*) FROM migrations");
+            $needsMigration = ((int) $stmt->fetchColumn()) === 0;
+            $pdo = null;
         } catch (\Throwable $e) {
-            error_log('Vercel DB Auto-Migration Notice: ' . $e->getMessage());
+            // migrations table missing -> fresh database, needs migration
+            $needsMigration = true;
+        }
+
+        if ($needsMigration) {
+            try {
+                require_once __DIR__ . '/../vendor/autoload.php';
+                $app = require __DIR__ . '/../bootstrap/app.php';
+                $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+                $kernel->call('migrate', ['--force' => true]);
+                $kernel->call('db:seed', ['--force' => true]);
+                @touch($migratedFlag);
+
+                // Handle request directly
+                $app->handleRequest(\Illuminate\Http\Request::capture());
+                exit;
+            } catch (\Throwable $e) {
+                error_log('Vercel DB Auto-Migration Notice: ' . $e->getMessage());
+            }
+        } else {
+            @touch($migratedFlag);
         }
     }
 } else {
@@ -134,9 +167,9 @@ if (!empty($dbHost) && $dbHost !== '127.0.0.1' && $dbHost !== 'localhost') {
     $_ENV['DB_DATABASE'] = $tmpSqlite;
     $_SERVER['DB_DATABASE'] = $tmpSqlite;
 
-    putenv("SESSION_DRIVER=database");
-    $_ENV['SESSION_DRIVER'] = 'database';
-    $_SERVER['SESSION_DRIVER'] = 'database';
+    putenv("SESSION_DRIVER=cookie");
+    $_ENV['SESSION_DRIVER'] = 'cookie';
+    $_SERVER['SESSION_DRIVER'] = 'cookie';
 
     putenv("CACHE_STORE=database");
     $_ENV['CACHE_STORE'] = 'database';
