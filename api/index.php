@@ -55,26 +55,7 @@ $_SERVER['LOG_CHANNEL'] = 'stderr';
 
 // Check if a remote database (e.g. Aiven) is configured via Vercel Environment Variables
 $dbHost = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? '');
-if (!empty($dbHost) && $dbHost !== '127.0.0.1' && $dbHost !== 'localhost') {
-    // Automatically run migrations & seeders on the remote Aiven database if not yet run
-    $migratedFlag = '/tmp/aiven_migrated';
-    if (!file_exists($migratedFlag)) {
-        try {
-            require_once __DIR__ . '/../vendor/autoload.php';
-            $app = require __DIR__ . '/../bootstrap/app.php';
-            $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
-            $kernel->call('migrate', ['--force' => true]);
-            $kernel->call('db:seed', ['--force' => true]);
-            @touch($migratedFlag);
-
-            // Handle the request directly using the booted $app
-            $app->handleRequest(\Illuminate\Http\Request::capture());
-            exit;
-        } catch (\Throwable $e) {
-            error_log('Aiven Auto-Migration Notice: ' . $e->getMessage());
-        }
-    }
-} else {
+if (empty($dbHost) || $dbHost === '127.0.0.1' || $dbHost === 'localhost') {
     // Fallback to bundled SQLite database in /tmp
     $tmpSqlite = '/tmp/database.sqlite';
     $sourceSqlite = __DIR__ . '/../database/database.sqlite';
