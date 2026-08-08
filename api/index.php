@@ -53,9 +53,69 @@ putenv("LOG_CHANNEL=stderr");
 $_ENV['LOG_CHANNEL'] = 'stderr';
 $_SERVER['LOG_CHANNEL'] = 'stderr';
 
-// Check if a remote database (e.g. Aiven) is configured via Vercel Environment Variables
+// Detect Vercel Marketplace Database (Neon / Supabase / Postgres) or DB_HOST
+$postgresUrl = getenv('POSTGRES_URL') ?: (getenv('DATABASE_URL') ?: ($_ENV['POSTGRES_URL'] ?? ($_ENV['DATABASE_URL'] ?? '')));
 $dbHost = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? '');
-if (empty($dbHost) || $dbHost === '127.0.0.1' || $dbHost === 'localhost') {
+
+if (!empty($postgresUrl)) {
+    $dbParams = parse_url($postgresUrl);
+    putenv("DB_CONNECTION=pgsql");
+    $_ENV['DB_CONNECTION'] = 'pgsql';
+    $_SERVER['DB_CONNECTION'] = 'pgsql';
+
+    if (isset($dbParams['host'])) {
+        putenv("DB_HOST=" . $dbParams['host']);
+        $_ENV['DB_HOST'] = $dbParams['host'];
+        $_SERVER['DB_HOST'] = $dbParams['host'];
+    }
+    if (isset($dbParams['port'])) {
+        putenv("DB_PORT=" . $dbParams['port']);
+        $_ENV['DB_PORT'] = $dbParams['port'];
+        $_SERVER['DB_PORT'] = $dbParams['port'];
+    }
+    if (isset($dbParams['path'])) {
+        $dbName = ltrim($dbParams['path'], '/');
+        putenv("DB_DATABASE=" . $dbName);
+        $_ENV['DB_DATABASE'] = $dbName;
+        $_SERVER['DB_DATABASE'] = $dbName;
+    }
+    if (isset($dbParams['user'])) {
+        putenv("DB_USERNAME=" . $dbParams['user']);
+        $_ENV['DB_USERNAME'] = $dbParams['user'];
+        $_SERVER['DB_USERNAME'] = $dbParams['user'];
+    }
+    if (isset($dbParams['pass'])) {
+        putenv("DB_PASSWORD=" . urldecode($dbParams['pass']));
+        $_ENV['DB_PASSWORD'] = urldecode($dbParams['pass']);
+        $_SERVER['DB_PASSWORD'] = urldecode($dbParams['pass']);
+    }
+    putenv("DB_SSLMODE=require");
+    $_ENV['DB_SSLMODE'] = 'require';
+    $_SERVER['DB_SSLMODE'] = 'require';
+
+    $dbHost = $dbParams['host'] ?? $dbHost;
+}
+
+if (!empty($dbHost) && $dbHost !== '127.0.0.1' && $dbHost !== 'localhost') {
+    // Automatically run migrations & seeders on the remote Vercel/Neon database if not yet run
+    $migratedFlag = '/tmp/vercel_db_migrated';
+    if (!file_exists($migratedFlag)) {
+        try {
+            require_once __DIR__ . '/../vendor/autoload.php';
+            $app = require __DIR__ . '/../bootstrap/app.php';
+            $kernel = $app->make(\Illuminate\Contracts\Console\Kernel::class);
+            $kernel->call('migrate', ['--force' => true]);
+            $kernel->call('db:seed', ['--force' => true]);
+            @touch($migratedFlag);
+
+            // Handle request directly
+            $app->handleRequest(\Illuminate\Http\Request::capture());
+            exit;
+        } catch (\Throwable $e) {
+            error_log('Vercel DB Auto-Migration Notice: ' . $e->getMessage());
+        }
+    }
+} else {
     // Fallback to bundled SQLite database in /tmp
     $tmpSqlite = '/tmp/database.sqlite';
     $sourceSqlite = __DIR__ . '/../database/database.sqlite';
