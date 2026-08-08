@@ -45,7 +45,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
             'module' => \App\Http\Middleware\ModuleAccess::class,
+            'edge-cache' => \App\Http\Middleware\EdgeCacheResponse::class,
         ]);
+        // The edge-cached homepage carries no session, so its CSRF token
+        // cannot be validated — exempt the public booking form.
+        $middleware->validateCsrfTokens(except: ['book']);
     })
 
     ->withExceptions(function (Exceptions $exceptions): void {

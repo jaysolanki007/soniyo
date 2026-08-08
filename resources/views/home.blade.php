@@ -287,11 +287,11 @@
       @csrf
       <h3>Request an Appointment</h3>
       <p class="sub">Complimentary consultation with your first visit.</p>
-      @if (session('booking_success'))
-        <p class="form-msg" style="color:var(--gold-soft)">{{ session('booking_success') }}</p>
+      @if (session('booking_success') || request()->boolean('booked'))
+        <p class="form-msg" style="color:var(--gold-soft)">Thank you! Your request has been received — our concierge will confirm within 24 hours.</p>
       @endif
-      @if ($errors->any())
-        <p class="form-msg" style="color:#e08">{{ $errors->first() }}</p>
+      @if ($errors->any() || request()->boolean('booking_error'))
+        <p class="form-msg" style="color:#e08">{{ $errors->first() ?: 'Sorry, something went wrong — please check your details and try again.' }}</p>
       @endif
       <div class="field-row">
         <div class="field"><label>Full Name</label><input type="text" name="customer_name" value="{{ old('customer_name') }}" required placeholder="Jane Doe"></div>

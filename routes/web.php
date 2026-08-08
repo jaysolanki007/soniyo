@@ -28,7 +28,7 @@ use Illuminate\Support\Facades\Route;
 | Public website
 |--------------------------------------------------------------------------
 */
-Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/', [HomeController::class, 'index'])->middleware('edge-cache:300')->name('home');
 Route::post('/book', [BookingController::class, 'store'])->name('booking.store');
 
 /*

@@ -60,6 +60,13 @@ if (empty(getenv('SESSION_DRIVER')) && empty($_ENV['SESSION_DRIVER'])) {
     $_SERVER['SESSION_DRIVER'] = 'cookie';
 }
 
+// File cache (in /tmp) avoids a remote DB round trip on every Cache:: call
+if (empty(getenv('CACHE_STORE')) && empty($_ENV['CACHE_STORE'])) {
+    putenv("CACHE_STORE=file");
+    $_ENV['CACHE_STORE'] = 'file';
+    $_SERVER['CACHE_STORE'] = 'file';
+}
+
 // Detect Vercel Marketplace Database (Neon / Supabase / Postgres) or DB_HOST
 $postgresUrl = getenv('POSTGRES_URL') ?: (getenv('DATABASE_URL') ?: ($_ENV['POSTGRES_URL'] ?? ($_ENV['DATABASE_URL'] ?? '')));
 $dbHost = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? '');
@@ -171,9 +178,9 @@ if (!empty($dbHost) && $dbHost !== '127.0.0.1' && $dbHost !== 'localhost') {
     $_ENV['SESSION_DRIVER'] = 'cookie';
     $_SERVER['SESSION_DRIVER'] = 'cookie';
 
-    putenv("CACHE_STORE=database");
-    $_ENV['CACHE_STORE'] = 'database';
-    $_SERVER['CACHE_STORE'] = 'database';
+    putenv("CACHE_STORE=file");
+    $_ENV['CACHE_STORE'] = 'file';
+    $_SERVER['CACHE_STORE'] = 'file';
 }
 
 // Forward request to Laravel's public/index.php

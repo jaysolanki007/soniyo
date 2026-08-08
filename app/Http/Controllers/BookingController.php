@@ -11,14 +11,20 @@ class BookingController extends Controller
 {
     public function store(Request $request)
     {
-        $data = $request->validate([
+        try {
+            $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['required', 'string', 'max:50'],
             'customer_email' => ['nullable', 'email'],
             'service_id' => ['nullable', 'exists:services,id'],
-            'scheduled_at' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string'],
-        ]);
+                'scheduled_at' => ['nullable', 'date'],
+                'notes' => ['nullable', 'string'],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Homepage is edge-cached without sessions, so flashed errors
+            // wouldn't render — signal failure via query string instead.
+            return redirect('/?booking_error=1#book');
+        }
 
         // Link or create a customer record (CRM)
         $customer = null;
@@ -47,6 +53,8 @@ class BookingController extends Controller
             'notes' => $data['notes'] ?? null,
         ]);
 
-        return back()->with('booking_success', 'Thank you! Your request has been received — our concierge will confirm within 24 hours.');
+        // The homepage is edge-cached without sessions, so a session flash
+        // can't be displayed there — signal success via query string instead.
+        return redirect('/?booked=1#book');
     }
 }
