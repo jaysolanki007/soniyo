@@ -116,6 +116,9 @@ if (!empty($dbHost) && $dbHost !== '127.0.0.1' && $dbHost !== 'localhost') {
     // itself, so new serverless instances DON'T re-run migrate/seed on cold start.
     $migratedFlag = '/tmp/vercel_db_migrated';
     if (!file_exists($migratedFlag)) {
+        // Only migrate when we can POSITIVELY confirm a fresh database.
+        // A failed/slow connection must NOT trigger migrations, otherwise
+        // every request during a DB wake-up pays a 10s+ migrate/seed cycle.
         $needsMigration = false;
         try {
             $dsn = sprintf(
@@ -126,14 +129,22 @@ if (!empty($dbHost) && $dbHost !== '127.0.0.1' && $dbHost !== 'localhost') {
             );
             $pdo = new \PDO($dsn, getenv('DB_USERNAME'), getenv('DB_PASSWORD'), [
                 \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
-                \PDO::ATTR_TIMEOUT => 5,
+                \PDO::ATTR_TIMEOUT => 3,
             ]);
-            $stmt = $pdo->query("SELECT COUNT(*) FROM migrations");
-            $needsMigration = ((int) $stmt->fetchColumn()) === 0;
+            $exists = $pdo->query(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'migrations')"
+            )->fetchColumn();
+            if (!$exists) {
+                $needsMigration = true; // confirmed: connected, table absent
+            } else {
+                $count = (int) $pdo->query("SELECT COUNT(*) FROM migrations")->fetchColumn();
+                $needsMigration = ($count === 0); // confirmed: connected, never migrated
+            }
             $pdo = null;
         } catch (\Throwable $e) {
-            // migrations table missing -> fresh database, needs migration
-            $needsMigration = true;
+            // Could not confirm DB state — do NOT migrate; serve the request.
+            error_log('Vercel DB check skipped: ' . $e->getMessage());
+            $needsMigration = false;
         }
 
         if ($needsMigration) {
